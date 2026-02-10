@@ -71,8 +71,63 @@ class FormPanel extends FormFieldBase {
      */
     setFocus(id) {
         const fieldType = this.parentView?.getModel()?.fieldType;
-        if (fieldType !== 'form' && this.parentView.setFocus) {
+        if (fieldType !== 'form' && this.parentView?.setFocus) {
             this.parentView.setFocus(this.getId());
+        }
+    }
+
+    getActiveRepeatableNonRepeatableTabId(items, id){
+        for (const item of items) {
+            if(item.id === id){
+                return id;
+            } else if(item.fieldType === 'panel' && item.type === 'array'){
+                const repeatableItems = this.formContainer.getModel().getElement(item.id).getState();
+                const result = this.getActiveRepeatableNonRepeatableTabId(repeatableItems.items, id);
+                if (result) {
+                    return result;
+                }
+            }
+        }
+        return null;
+    }
+  
+    /**
+     * Sets the focus to first field while navigating in navigable layouts.
+     * @param {string} id - The ID of the field to set focus to.
+     */
+    focusToFirstVisibleField(id) {
+        const form = this.formContainer.getModel();
+        const activeTabId = this.getActiveRepeatableNonRepeatableTabId(this.getModel().getState().items, id); 
+        const activeTab = form.getElement(activeTabId);
+        if (!activeTab) {
+            return;
+        }
+
+        const findFirstPanelNonPanelField = (item) => {
+            // Return early if not visible
+            if (!item.visible || !item.enabled) {
+                return null;
+            }
+        
+            // If item is not a panel, return it
+            if (item.fieldType && item.fieldType !== "panel") {
+                return item;
+            } else {
+                // Check each child
+                for (const childItem of item.items) {
+                    const result = findFirstPanelNonPanelField(childItem);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+
+            return null;
+        };
+    
+        const firstField = findFirstPanelNonPanelField(activeTab);
+        if (firstField) {
+            setTimeout(() => {this.formContainer.setFocus(firstField.id)}, 0);
         }
     }
 
@@ -131,6 +186,23 @@ class FormPanel extends FormFieldBase {
      */
     handleChildRemoval(childView) {
         //This needs to be handled in tabs, accordion, wizard
+    }
+
+    /**
+     * Extends the standard updateLabel by applying the panel title as an aria-label
+     * Useful for panel components like "Terms and Conditions" which were being ignored by NVDA
+     * @param {Object} label - The label.
+     */
+    updateLabel(label) {
+        super.updateLabel(label);
+
+        const bemClass = Array.from(this.element.classList).filter(bemClass => !bemClass.includes('--'))[0];
+        const labelContainer = this.element.querySelector(`.${bemClass}__label-container`).querySelector(`.${bemClass}__label`);
+        const regionContainer = this.element.querySelector(`.${bemClass}__widget-container`);
+
+        if(regionContainer && regionContainer.hasAttribute('role') && (regionContainer.getAttribute('role') === 'region')) {
+            regionContainer.setAttribute('aria-label', labelContainer.innerHTML);
+        }
     }
 
     /**

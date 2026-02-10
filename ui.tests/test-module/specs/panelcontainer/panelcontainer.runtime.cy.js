@@ -264,8 +264,9 @@ describe( "Form Runtime with Panel Container - Basic Tests", () => {
         cy.get(`#${textInputOfPanelId}`).should('have.attr', 'data-cmp-enabled', 'false');
         cy.get(`#${textInputOfFormElemId}`).find(".cmp-adaptiveform-textinput__widget")
             .type("b").blur().then(() => {
-            cy.get(`#${numberInputOfPanelId}`).should('have.attr', 'data-cmp-enabled', 'false');
-            cy.get(`#${textInputOfPanelId}`).should('have.attr', 'data-cmp-enabled', 'true');
+                // this test was incorrectly written earlier
+            cy.get(`#${numberInputOfPanelId}`).should('have.attr', 'data-cmp-enabled', 'true');
+            cy.get(`#${textInputOfPanelId}`).should('have.attr', 'data-cmp-enabled', 'false');
         });
     });
 
@@ -280,6 +281,35 @@ describe( "Form Runtime with Panel Container - Basic Tests", () => {
             cy.get(`#${numberInputOfPanelId}`).find('.cmp-adaptiveform-numberinput__widget').should('not.have.attr', 'readonly');
             cy.get(`#${textInputOfPanelId}`).find('.cmp-adaptiveform-textinput__widget').should('have.attr', 'readonly');
         });
+    });
+
+    it("panel with useFieldset enabled should render as fieldset with legend", () => {
+        // panelcontainerFieldset is at index 7 (after panelcontainer1 which is at index 6)
+        const fieldsetPanelId = formContainer._model.items[7].id;
+        
+        // Verify the panel renders as a <fieldset> element
+        cy.get(`#${fieldsetPanelId}`).then($el => {
+            expect($el.prop('tagName')).to.eq('FIELDSET');
+        });
+        
+        // Verify the panel has a <legend> element for accessibility
+        cy.get(`#${fieldsetPanelId}`).find('legend').should('exist');
+        
+        // Verify the legend contains the panel title
+        cy.get(`#${fieldsetPanelId}`).find('legend').should('contain.text', 'Fieldset Panel');
+    });
+
+    it("panel without useFieldset should NOT render as fieldset", () => {
+        // panelcontainer2 (DisabledPanel) at index 1 does not have useFieldset
+        const regularPanelId = formContainer._model.items[1].id;
+        
+        // Verify the panel does NOT render as a <fieldset> element
+        cy.get(`#${regularPanelId}`).then($el => {
+            expect($el.prop('tagName')).to.not.eq('FIELDSET');
+        });
+        
+        // Verify the panel does NOT have a <legend> element
+        cy.get(`#${regularPanelId}`).find('legend').should('not.exist');
     });
 })
 

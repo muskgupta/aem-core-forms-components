@@ -64,7 +64,7 @@ public interface FormContainer extends Container {
      */
     String PN_CLIENT_LIB_REF = GuideConstants.CLIENT_LIB_REF;
 
-    String DEFAULT_FORMS_SPEC_VERSION = "0.14.2";
+    String DEFAULT_FORMS_SPEC_VERSION = "0.15.2";
 
     /**
      * Returns form metadata {@link FormMetaData}
@@ -382,6 +382,17 @@ public interface FormContainer extends Container {
      */
     @JsonIgnore
     default String getCustomFunctionUrl() {
+        return null;
+    }
+
+    /**
+     * Returns the auto save configuration
+     *
+     * @return auto save configuration
+     * @since com.adobe.cq.forms.core.components.models.form 5.11.0
+     */
+    @JsonIgnore
+    default AutoSaveConfiguration getAutoSaveConfig() {
         return null;
     }
 

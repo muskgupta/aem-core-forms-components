@@ -30,7 +30,6 @@ import java.util.stream.StreamSupport;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jackrabbit.JcrConstants;
@@ -54,6 +53,7 @@ import com.adobe.granite.ui.components.Value;
 import com.adobe.granite.ui.components.ds.DataSource;
 import com.adobe.granite.ui.components.ds.SimpleDataSource;
 import com.adobe.granite.ui.components.ds.ValueMapResource;
+import com.day.cq.i18n.I18n;
 import com.day.cq.wcm.api.policies.ContentPolicy;
 import com.day.cq.wcm.foundation.forms.FormsManager;
 
@@ -143,7 +143,7 @@ public class FormMetaDataDataSourceServlet extends AbstractDataSourceServlet {
             FormMetaDataType type = FormMetaDataType.fromString(getParameter(config, TYPE, request, null));
             String dataModel = getParameter(config, DATA_MODEL, request, "");
             actionTypeDataSource = new SimpleDataSource(getDataSourceResources(
-                request, request.getResourceResolver(), type, dataModel).iterator());
+                request, request.getResourceResolver(), type, dataModel, config).iterator());
         }
         request.setAttribute(DataSource.class.getName(), actionTypeDataSource);
     }
@@ -171,8 +171,8 @@ public class FormMetaDataDataSourceServlet extends AbstractDataSourceServlet {
         return type.equals(FormMetaDataType.LANG) && entry.getKey().startsWith(FormMetaDataType.LANG.getValue());
     }
 
-    private List<Resource> getDataSourceResources(HttpServletRequest request, ResourceResolver resourceResolver, FormMetaDataType type,
-        String dataModel) {
+    private List<Resource> getDataSourceResources(SlingHttpServletRequest request, ResourceResolver resourceResolver, FormMetaDataType type,
+        String dataModel, Config config) {
         List<Resource> resources = new ArrayList<>();
         FormMetaData formMetaData = resourceResolver.adaptTo(FormMetaData.class);
         if (formMetaData != null) {
@@ -218,7 +218,10 @@ public class FormMetaDataDataSourceServlet extends AbstractDataSourceServlet {
                     break;
                 case PREFILL_ACTION:
                     metaDataList = formMetaData.getPrefillActions();
-                    resources = this.getResourceListFromComponentDescription(metaDataList, resourceResolver);
+                    // Add an explicit empty option so authors can clear an already selected prefill service.
+                    I18n i18n = new I18n(request.getResourceBundle(request.getLocale()));
+                    resources.add(getResourceForDropdownDisplay(resourceResolver, i18n.get("None"), ""));
+                    resources.addAll(this.getResourceListFromComponentDescription(metaDataList, resourceResolver));
                     break;
             }
         }

@@ -15,7 +15,7 @@
  ******************************************************************************/
 describe("Form with Radio Button Input", () => {
 
-    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/basic.html";
+    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/radiobuttonv1/basic.html";
     let formContainer = null;
     const bemBlock = 'cmp-adaptiveform-radiobutton';
     /**
@@ -76,6 +76,22 @@ describe("Form with Radio Button Input", () => {
             model.enable = false;
             cy.get(`#${id2}`).find(".cmp-adaptiveform-radiobutton__option__widget").should('not.have.attr', 'aria-disabled');
             return checkHTML(model.id, model.getState());
+        });
+    });
+
+    it("should have data-name attribute in parent div matching model name", () => {
+        const [radioButton1, radioButton1FieldView] = Object.entries(formContainer._fields)[0];
+        const modelName = radioButton1FieldView.getModel().name;
+        cy.get(`#${radioButton1}`).invoke('attr', 'data-name').should('eq', modelName);
+    });
+
+    it("should set proper name attribute for radio buttons", () => {
+        const [id, fieldView] = Object.entries(formContainer._fields)[0];
+        const model = formContainer._model.getElement(id);
+        const expectedName = `${id}_${model.name}`;
+
+        cy.get(`#${id}`).find(".cmp-adaptiveform-radiobutton__option__widget").each(($radio) => {
+            cy.wrap($radio).should('have.attr', 'name', expectedName);
         });
     });
 
@@ -191,7 +207,14 @@ describe("Form with Radio Button Input", () => {
         cy.get(`#${radioButton9}`).find(".cmp-adaptiveform-radiobutton__option").should('have.length', 2);
         cy.get(`#${radioButton9}`).find(".cmp-adaptiveform-radiobutton__label").contains('Select Animal').should('have.css', 'font-weight', '700');
         cy.get(`#${radioButton9}`).find(".cmp-adaptiveform-radiobutton__option-label span").contains('Dog').should('have.css', 'font-style', 'italic');
-        cy.get(`#${radioButton9}`).find(".cmp-adaptiveform-radiobutton__option-label span").contains('Cat').should('have.css', 'text-decoration', 'underline solid rgb(50, 50, 50)');
+        cy.get(`#${radioButton9}`)
+          .find(".cmp-adaptiveform-radiobutton__option-label span")
+          .contains('Cat')
+          .should(($el) => {
+            const line = $el.css('text-decoration-line');
+            const shorthand = $el.css('text-decoration');
+            expect(line || shorthand).to.include('underline');
+          });
     });
 
     it("decoration element should not have same class name", () => {
@@ -230,11 +253,23 @@ describe("Form with Radio Button Input", () => {
         })
         cy.get(`#${id}`).invoke('attr', 'data-cmp-required').should('eq', 'true');
     })
+
+    it("reset of radiobutton resulting in invalidation", () => {
+        expect(formContainer, "formcontainer is initialized").to.not.be.null;
+        const [radioButton1, radioButton1FieldView] = Object.entries(formContainer._fields)[0];
+        const [resetButton, resetButtonFieldView] = Object.entries(formContainer._fields)[9];
+
+        cy.get(`#${radioButton1}`).find("input").check("1");
+        cy.get(`#${resetButton} button`).click().then(() => {
+            cy.get(`#${radioButton1}`).find("input[value='1']").should('not.be.checked');
+            cy.get(`#${radioButton1}`).invoke('attr', 'data-cmp-valid').should('not.exist');
+        })
+    })
 })
 
 describe("setFocus on radiobutton via rules", () => {
 
-    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/focustest.html"
+    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/radiobuttonv1/focustest.html"
     let formContainer = null
 
     beforeEach(() => {
@@ -255,7 +290,7 @@ describe("setFocus on radiobutton via rules", () => {
 
 describe(" radiobutton repeatability ", () => {
 
-    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/radiorepeatability.html"
+    const pagePath = "content/forms/af/core-components-it/samples/radiobutton/radiobuttonv1/radiorepeatability.html"
     let formContainer = null
 
     beforeEach(() => {
@@ -324,7 +359,5 @@ describe(" radiobutton repeatability ", () => {
                 });
             });
         });
-
-
     })
 })

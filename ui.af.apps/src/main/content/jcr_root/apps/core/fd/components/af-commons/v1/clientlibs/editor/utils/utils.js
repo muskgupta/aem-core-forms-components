@@ -177,18 +177,27 @@
                     let patternComponentParentDiv=patternComponent.closest("div");
                     patternComponentParentDiv.setAttribute("hidden", true);
                 }else {
-                    let displayFormatParentDiv=formatComponent.closest("div");
-                    switch (displayPatternSelectedValue) {
-                        case ""     :
-                        case "#####################.###############" :
-                            displayFormatParentDiv.setAttribute("hidden", true);
-                            break;
-                        default           :
-                            displayFormatParentDiv.removeAttribute("hidden");
+                    // Dropdown exists and is not hidden
+                    // Case 1 : Format component exists and is hidden - Make sure format text field is visible if pattern is not "select"
+                    if(formatComponent && formatComponent.closest("div").hasAttribute("hidden") && displayPatternSelectedValue != "select"){
+                        formatComponent.closest("div").removeAttribute("hidden");
                     }
-                }
-                if(displayPatternSelectedValue!="custom") {
-                    formatComponent.value = patternComponent.value;
+                    // Case 2 : Format component exists and is not hidden
+                    if (formatComponent && !formatComponent.closest("div").hasAttribute("hidden")) {
+                        let displayFormatParentDiv=formatComponent.closest("div");
+                        switch (displayPatternSelectedValue) {
+                            case ""     :
+                            case "#####################.###############" :
+                                displayFormatParentDiv.setAttribute("hidden", true);
+                                break;
+                            default           :
+                                displayFormatParentDiv.removeAttribute("hidden");
+                        }
+                        // Only update format component value if it exists and is not hidden
+                        if (displayPatternSelectedValue != "custom") {
+                            formatComponent.value = patternComponent.value;
+                        }
+                    }
                 }
             }
         }

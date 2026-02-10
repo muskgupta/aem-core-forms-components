@@ -55,6 +55,9 @@ describe('Page - Authoring', function () {
             .should("exist");
         cy.get("[name='./jcr:title']")
             .should("exist");
+        cy.get("[name='./fd:useFieldset']")
+            .should("exist");
+
         if (!isSites) {
             cy.get("[name='./layout']")
                 .should("not.exist");
@@ -76,6 +79,63 @@ describe('Page - Authoring', function () {
 
         cy.get('.cq-dialog-cancel').click();
         cy.deleteComponentByPath(panelContainerDrop);
+    };
+
+    const testSaveAsFragmentBehaviour = (pagePath, panelContainerEditPathSelector, panelContainerPath, isSites) => {
+        if (isSites) {
+            dropPanelInSites();
+        } else {
+            dropPanelInContainer();
+        }
+        cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + panelContainerEditPathSelector);
+        cy.invokeEditableAction("[data-action='saveAsFragment']"); // this line is causing frame busting which is causing cypress to fail
+        // Check If Dialog Options Are Visible
+        cy.get("[name='name']")
+            .should("be.visible");
+        cy.get("[name='jcr:title']")
+            .should("exist");
+        cy.get("[name='targetPath']")
+            .should("be.visible")
+            .invoke('val', "/content/dam/formsanddocuments");
+        cy.get("[name='./schemaType']")
+            .should("exist");
+        cy.get("[name='templatePath']")
+            .should("be.visible");
+        // Assuming there is one fragment component (in most cases) so this field should not be visible
+        cy.get("[name='fragmentComponent']").should("not.be.visible");
+
+        cy.intercept('POST' , '**/adobe/forms/fm/v1/saveasfragment').as('saveAsFragment');
+        cy.get("[name='name']").clear().type("panel-saved-as-fragment");
+        // Coral autocomplete component is taking some time to initialisation
+        cy.get('.cmp-adaptiveform-saveasfragment__templateselector')
+            .should(($el) => {
+                expect($el.data('autocomplete')).to.exist;
+            });
+        cy.get("[name='templatePath']")
+            .invoke("val", "/conf/core-components-examples/settings/wcm/templates/afv2frag-template")
+            .trigger("change");
+        cy.get(".cq-dialog-submit").click();
+        cy.wait('@saveAsFragment').then(({request, response}) => {
+            expect(response.statusCode).to.equal(200);
+            expect(response.body).to.have.property('formPath', '/content/dam/formsanddocuments/panel-saved-as-fragment');
+        });
+        cy.openSiteAuthoring(pagePath);
+        cy.deleteComponentByPath(panelContainerPath)
+    }
+
+    const deleteSavedFragment = () => {
+        cy.openPage("/aem/forms.html/content/dam/formsanddocuments", {noLogin: true});
+        cy.get("body").then(($body) => {
+            const selector = "[data-foundation-collection-item-id='/content/dam/formsanddocuments/panel-saved-as-fragment']";
+            if ($body.find(selector).length > 0) {
+                cy.get(selector)
+                    .trigger('mouseenter')
+                    .trigger('mouseover');
+                cy.get(`${selector} [title='Select']`).click({ force: true });
+                cy.get(".formsmanager-admin-action-delete").click();
+                cy.get("#fmbase-id-modal-template button[variant='warning']").click();
+            }
+        });
     }
 
     context('Open Forms Editor', function () {
@@ -92,9 +152,14 @@ describe('Page - Authoring', function () {
             cy.deleteComponentByPath(panelEditPath);
         });
 
+        it('Check placeholder text in Panel ', function () {
+            dropPanelInContainer();
+            cy.get(panelContainerPathSelector).get("[data-text='Please drag Panel components here']").should("exist");;
+        });
+
         it('open edit dialog of Panel', function () {
             testPanelBehaviour(panelContainerPathSelector, panelEditPath);
-        });
+        })
 
         it('check rich text support for label', function(){
             dropPanelInContainer();
@@ -108,6 +173,62 @@ describe('Page - Authoring', function () {
             cy.get('.cq-dialog-cancel').click();
             cy.deleteComponentByPath(panelEditPath);
         });
+
+        it('check fieldset option exists and behavior', function(){
+            dropPanelInContainer();
+            cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + panelContainerPathSelector);
+            cy.invokeEditableAction("[data-action='CONFIGURE']");
+
+            // Verify useFieldset checkbox exists
+            cy.get("[name='./fd:useFieldset']")
+                .first()
+                .should("exist")
+                .should("be.visible");
+
+            // Get the title field label and verify initial state
+            cy.get("[name='./jcr:title']").should("exist");
+
+            // Check if useFieldset checkbox is checked and verify title becomes required
+            cy.get("[name='./fd:useFieldset']").first().then(($checkbox) => {
+                const isChecked = $checkbox.prop('checked');
+                // Find the label for jcr:title field by navigating from the input to its parent wrapper
+                cy.get("[name='./jcr:title']").parent().find('label').then(($label) => {
+                    if (isChecked) {
+                        // When fieldset is checked, title should be required
+                        expect($label.text()).to.include('*');
+                    }
+                });
+            });
+
+            // Toggle the checkbox and verify the label changes accordingly
+            cy.get("[name='./fd:useFieldset']").first().click();
+            cy.get("[name='./fd:useFieldset']").first().then(($checkbox) => {
+                const isChecked = $checkbox.prop('checked');
+                cy.get("[name='./jcr:title']").parent().find('label').then(($label) => {
+                    if (isChecked) {
+                        // When fieldset is checked, title should be required
+                        expect($label.text()).to.include('*');
+                    } else {
+                        // When fieldset is unchecked, title should not be required
+                        expect($label.text()).to.not.include('*');
+                    }
+                });
+            });
+
+            cy.get('.cq-dialog-cancel').click();
+            cy.deleteComponentByPath(panelEditPath);
+        });
+
+        if (cy.af.isLatestAddon()) {
+            it('Save panel as fragment via toolbar', { retries: 3}, function () {
+                cy.cleanTest(panelEditPath).then(function () {
+                    deleteSavedFragment();
+                    cy.openSiteAuthoring(pagePath);
+                    testSaveAsFragmentBehaviour(pagePath, panelContainerPathSelector, panelEditPath);
+                    deleteSavedFragment();
+                })
+            })
+       }
     })
 
     context('Open Sites Editor', function () {
@@ -129,5 +250,15 @@ describe('Page - Authoring', function () {
             testPanelBehaviour(panelContainerEditPathSelector, panelContainerEditPath, true);
         });
 
+        if (cy.af.isLatestAddon()) {
+            it('Save panel as fragment via toolbar', { retries: 3}, function () {
+                cy.cleanTest(panelContainerEditPath).then(function () {
+                    deleteSavedFragment();
+                    cy.openSiteAuthoring(pagePath);
+                    testSaveAsFragmentBehaviour(pagePath, panelContainerEditPathSelector, panelContainerEditPath, true);
+                    deleteSavedFragment();
+                })
+            });
+        }
     });
 });

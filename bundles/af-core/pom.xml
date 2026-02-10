@@ -20,7 +20,7 @@
     <parent>
         <groupId>com.adobe.aem</groupId>
         <artifactId>core-forms-components-parent</artifactId>
-        <version>3.0.73-SNAPSHOT</version>
+        <version>3.0.141-SNAPSHOT</version>
         <relativePath>../../parent/pom.xml</relativePath>
     </parent>
 
@@ -552,7 +552,7 @@
         <dependency>
             <groupId>org.junit.platform</groupId>
             <artifactId>junit-platform-commons</artifactId>
-            <version>1.5.2</version>
+            <version>1.10.2</version>
             <scope>test</scope>
         </dependency>
         <!--
@@ -653,6 +653,10 @@
             <groupId>com.adobe.cq</groupId>
             <artifactId>core.wcm.components.core</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.adobe.aem</groupId>
+            <artifactId>core-forms-print-components-print-dor-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.sling</groupId>

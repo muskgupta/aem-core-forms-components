@@ -54,6 +54,63 @@ describe('Page - Authoring', function () {
         cy.get('body').click(0, 0);
     }
 
+    const testSaveAsFragment = function (pagePath, wizardEditPathSelector, wizardPath, isSites) {
+        if (isSites) {
+            dropWizardInSites();
+        } else {
+            dropWizardInContainer();
+        }
+        cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + wizardEditPathSelector);
+        cy.invokeEditableAction("[data-action='saveAsFragment']"); // this line is causing frame busting which is causing cypress to fail
+        // Check If Dialog Options Are Visible
+        cy.get("[name='name']")
+            .should("be.visible");
+        cy.get("[name='jcr:title']")
+            .should("exist");
+        cy.get("[name='targetPath']")
+            .should("be.visible")
+            .invoke('val', "/content/dam/formsanddocuments");
+        cy.get("[name='./schemaType']")
+            .should("exist");
+        cy.get("[name='templatePath']")
+            .should("be.visible");
+        // Assuming there is one fragment component (in most cases) so this field should not be visible
+        cy.get("[name='fragmentComponent']").should("not.be.visible");
+
+        cy.intercept('POST' , '**/adobe/forms/fm/v1/saveasfragment').as('saveAsFragment');
+        cy.get("[name='name']").clear().type("panel-saved-as-fragment");
+        // Coral autocomplete component is taking some time to initialisation
+        cy.get('.cmp-adaptiveform-saveasfragment__templateselector')
+            .should(($el) => {
+                expect($el.data('autocomplete')).to.exist;
+            });
+        cy.get("[name='templatePath']")
+            .invoke("val", "/conf/core-components-examples/settings/wcm/templates/afv2frag-template")
+            .trigger("change");
+        cy.get(".cq-dialog-submit").click();
+        cy.wait('@saveAsFragment').then(({request, response}) => {
+            expect(response.statusCode).to.equal(200);
+            expect(response.body).to.have.property('formPath', '/content/dam/formsanddocuments/panel-saved-as-fragment');
+        });
+       cy.openSiteAuthoring(pagePath);
+       cy.deleteComponentByPath(wizardPath);
+    }
+
+    const deleteSavedFragment = () => {
+        cy.openPage("/aem/forms.html/content/dam/formsanddocuments", {noLogin: true});
+        cy.get("body").then(($body) => {
+            const selector = "[data-foundation-collection-item-id='/content/dam/formsanddocuments/panel-saved-as-fragment']";
+            if ($body.find(selector).length > 0) {
+                cy.get(selector)
+                    .trigger('mouseenter')
+                    .trigger('mouseover');
+                cy.get(`${selector} [title='Select']`).click({ force: true });
+                cy.get(".formsmanager-admin-action-delete").click();
+                cy.get("#fmbase-id-modal-template button[variant='warning']").click();
+            }
+        });
+    }
+
 
     context('Open Forms Editor', function () {
         const pagePath = "/content/forms/af/core-components-it/blank",
@@ -78,34 +135,38 @@ describe('Page - Authoring', function () {
         });
 
         it('runtime library should not be loaded', function() {
-            cy.intercept('GET', /jcr:content\/guideContainer\/wizard\.html/).as('wizardRequest');
-            dropWizardInContainer();
-            cy.wait('@wizardRequest').then((interception) => {
-                const htmlContent = interception.response.body;
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlContent, 'text/html');
-                const runtimeUrlPattern = /core\/fd\/af-clientlibs\/core-forms-components-runtime-base/;
-                const scriptTags = Array.from(doc.querySelectorAll('script[src]'));
-                const isClientLibraryLoaded = scriptTags.some(script => runtimeUrlPattern.test(script.src));
-                expect(isClientLibraryLoaded).to.be.false;
-            })
-            cy.deleteComponentByPath(wizardLayoutDrop);
+            cy.cleanTest(wizardLayoutDrop).then(function () {
+                cy.intercept('GET', /jcr:content\/guideContainer\/wizard\.html/).as('wizardRequest');
+                dropWizardInContainer();
+                cy.wait('@wizardRequest').then((interception) => {
+                    const htmlContent = interception.response.body;
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    const runtimeUrlPattern = /core\/fd\/af-clientlibs\/core-forms-components-runtime-base/;
+                    const scriptTags = Array.from(doc.querySelectorAll('script[src]'));
+                    const isClientLibraryLoaded = scriptTags.some(script => runtimeUrlPattern.test(script.src));
+                    expect(isClientLibraryLoaded).to.be.false;
+                })
+                cy.deleteComponentByPath(wizardLayoutDrop);
+            });
         })
 
         it('verify Basic tab in edit dialog of Wizard', function () {
-            dropWizardInContainer();
-            cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + wizardEditPathSelector).then(() => {
-                cy.invokeEditableAction(editDialogConfigurationSelector).then(() => {
-                    cy.get(wizardBlockBemSelector + '__editdialog').contains('Help Content').click().then(() => {
-                        cy.get(wizardBlockBemSelector + '__editdialog').contains('Basic').click().then(() => {
-                            cy.get("[name='./name']").should("exist");
-                            cy.get("[name='./jcr:title']").should("exist");
-                            cy.get("[name='./layout']").should("not.exist");
-                            cy.get("[name='./dataRef']").should("exist");
-                            cy.get("[name='./visible']").should("exist");
-                            cy.get("[name='./enabled']").should("exist");
-                            cy.get('.cq-dialog-cancel').should('be.visible').click().then(() => {
-                                cy.deleteComponentByPath(wizardLayoutDrop);
+            cy.cleanTest(wizardLayoutDrop).then(function () {
+                dropWizardInContainer();
+                cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + wizardEditPathSelector).then(() => {
+                    cy.invokeEditableAction(editDialogConfigurationSelector).then(() => {
+                        cy.get(wizardBlockBemSelector + '__editdialog').contains('Help Content').click().then(() => {
+                            cy.get(wizardBlockBemSelector + '__editdialog').contains('Basic').click().then(() => {
+                                cy.get("[name='./name']").should("exist");
+                                cy.get("[name='./jcr:title']").should("exist");
+                                cy.get("[name='./layout']").should("not.exist");
+                                cy.get("[name='./dataRef']").should("exist");
+                                cy.get("[name='./visible']").should("exist");
+                                cy.get("[name='./enabled']").should("exist");
+                                cy.get('.cq-dialog-cancel').should('be.visible').click().then(() => {
+                                    cy.deleteComponentByPath(wizardLayoutDrop);
+                                });
                             });
                         });
                     });
@@ -150,11 +211,37 @@ describe('Page - Authoring', function () {
                     cy.get("table.cmp-panelselector__table").find("tr").should("have.length", 2);
                     cy.get("table.cmp-panelselector__table").find(panelcontainerDataId).find("td").first().should('be.visible').click();
                     cy.get('body').click(0, 0);
-                    cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + panelcontainerDataPath);
+                    cy.get(`div[data-path='${wizardLayoutDrop}']`).click({force: true});
+                    cy.get(`div[data-path='${panelcontainerPath}']`).click({force: true});
+                    cy.get('#EditableToolbar').should('be.visible');
                     cy.deleteComponentByPath(wizardLayoutDrop);
                 });
             });
         });
+
+        it('verify second panel is not visible after adding two panels', function () {
+            cy.cleanTest(wizardLayoutDrop).then(function () {
+                dropWizardInContainer();
+                addComponentInWizard("Adaptive Form Panel", afConstants.components.forms.resourceType.panelcontainer);
+                addComponentInWizard("Adaptive Form Panel", afConstants.components.forms.resourceType.panelcontainer);
+                cy.reload()
+                cy.getContentIFrameBody().find('.cmp-adaptiveform-wizard__wizardpanel').should('have.length', 2);
+                cy.getContentIFrameBody().find('.cmp-adaptiveform-wizard__wizardpanel').eq(0).should('not.be.visible');
+                cy.getContentIFrameBody().find('.cmp-adaptiveform-wizard__wizardpanel').eq(1).should('not.be.visible');
+                cy.deleteComponentByPath(wizardLayoutDrop);
+            });
+        });
+
+        if (cy.af.isLatestAddon()) {
+            it('save as fragment in Wizard', {retries: 3}, function () {
+                cy.cleanTest(wizardLayoutDrop).then(function () {
+                    deleteSavedFragment();
+                    cy.openSiteAuthoring(pagePath);
+                    testSaveAsFragment(pagePath, wizardEditPathSelector, wizardLayoutDrop);
+                    deleteSavedFragment();
+                })
+            })
+        }
     });
 
     context('Open Sites Editor', function () {
@@ -206,17 +293,27 @@ describe('Page - Authoring', function () {
                 dropWizardInSites();
                 addComponentInWizardOfSites("Adaptive Form Number Input", afConstants.components.forms.resourceType.formnumberinput);
                 addComponentInWizardOfSites("Adaptive Form Panel", afConstants.components.forms.resourceType.panelcontainer);
-                cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + wizardEditPathSelector);
-                cy.invokeEditableAction(navigationPanelSelector);
                 cy.wait(2000).then(() => {
-                    cy.get("table.cmp-panelselector__table").find("tr").should("have.length", 2);
-                    cy.get("table.cmp-panelselector__table").find(panelcontainerDataId).find("td").first().should('be.visible').click();
+                    cy.get("#sidepanel-toggle-button").click();
+                    cy.get('coral-tab[icon="layers"][aria-label="Content Tree"]').click();
+                    cy.get(`div[data-path='${wizardEditPath}']`).click({force: true});
+                    cy.get(`div[data-path='${panelcontainerPath}']`).click({force: true});
+                    cy.get('#EditableToolbar').should('be.visible');
                     cy.get('body').click(0, 0);
-                    cy.openEditableToolbar(sitesSelectors.overlays.overlay.component + panelcontainerDataPath);
                     cy.deleteComponentByPath(wizardEditPath);
                 });
             });
         });
 
+        if (cy.af.isLatestAddon()) {
+            it('save as fragment in Wizard', { retries: 3 }, function() {
+                cy.cleanTest(wizardEditPath).then(function () {
+                    deleteSavedFragment();
+                    cy.openSiteAuthoring(pagePath);
+                    testSaveAsFragment(pagePath, wizardEditPathSelector, wizardEditPath, true);
+                    deleteSavedFragment();
+                })
+            });
+        }
     });
 })
